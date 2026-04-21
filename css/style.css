@@ -1,65 +1,34 @@
-/* 
-   ========================================
-   ECOLock - Hoja de Estilos Principal
-   ========================================
-   Principios aplicados:
-   - Mobile-first: Diseño base para celulares pequeños (320px+)
-   - Variables CSS: Facilitan el modo oscuro/claro
-   - Flexbox/Grid: Layouts adaptables
-   - Animaciones suaves: Transiciones de 200-300ms
-*/
-
-/* ========================================
-   1. VARIABLES CSS (Custom Properties)
-   ========================================
-   Definimos colores y valores reutilizables.
-   El modo oscuro es el default (proyecto IoT).
-*/
 :root {
-    /* Colores principales - Modo Oscuro (default) */
-    --bg-primary: #0f172a;      /* Fondo principal: azul muy oscuro */
-    --bg-secondary: #1e293b;     /* Fondos de secciones/cards */
-    --bg-tertiary: #334155;      /* Inputs, botones secundarios */
-    --text-primary: #f1f5f9;     /* Texto principal: casi blanco */
-    --text-secondary: #94a3b8;   /* Texto secundario: gris claro */
-    --accent-green: #22c55e;     /* Éxito, desbloqueado */
-    --accent-red: #ef4444;       /* Error, bloqueado, alerta */
-    --accent-blue: #3b82f6;      /* Info, botones primarios */
-    --accent-orange: #f97316;    /* Advertencias, pendiente */
-    
-    /* Estados del candado */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+    --accent-blue: #3b82f6;
+    --accent-orange: #f97316;
+    --accent-yellow: #fbbf24;
     --status-locked: var(--accent-red);
     --status-unlocked: var(--accent-green);
-    --status-offline: #6b7280;   /* Gris para sin conexión */
-    
-    /* Espaciado */
-    --space-xs: 0.25rem;   /* 4px */
-    --space-sm: 0.5rem;    /* 8px */
-    --space-md: 1rem;      /* 16px */
-    --space-lg: 1.5rem;    /* 24px */
-    --space-xl: 2rem;      /* 32px */
-    
-    /* Bordes */
+    --status-offline: #6b7280;
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-full: 9999px;
-    
-    /* Sombras */
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
     --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
-    
-    /* Transiciones */
     --transition-fast: 150ms ease;
     --transition-normal: 250ms ease;
     --transition-slow: 350ms ease;
 }
 
-/* ========================================
-   MODO CLARO (cuando el usuario lo selecciona)
-   Se activa con la clase .light-mode en <body>
-*/
 .light-mode {
     --bg-primary: #f8fafc;
     --bg-secondary: #ffffff;
@@ -71,12 +40,6 @@
     --shadow-lg: 0 10px 15px rgba(0,0,0,0.15);
 }
 
-/* ========================================
-   2. RESET Y ESTILOS BASE
-   ========================================
-   Normalizamos comportamientos entre navegadores
-   y establecemos la tipografía base.
-*/
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -84,8 +47,8 @@
 }
 
 html {
-    font-size: 16px; /* Base para cálculos rem */
-    -webkit-tap-highlight-color: transparent; /* Elimina flash azul en móviles */
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -96,19 +59,10 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    /* Prevenir scroll horizontal en móviles */
     overflow-x: hidden;
-    /* Suavizar fuentes en iOS */
     -webkit-font-smoothing: antialiased;
 }
 
-/* ========================================
-   3. LAYOUT PRINCIPAL
-   ========================================
-   Estructura: Header fijo, Main scrollable, Footer fijo
-*/
-
-/* --- Header --- */
 .app-header {
     background-color: var(--bg-secondary);
     padding: var(--space-md);
@@ -122,7 +76,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 480px; /* Ancho máximo para centrar en pantallas grandes */
+    max-width: 480px;
     margin: 0 auto;
     width: 100%;
 }
@@ -133,7 +87,6 @@ body {
     letter-spacing: -0.025em;
 }
 
-/* Badge de estado de conexión */
 .status-badge {
     display: flex;
     align-items: center;
@@ -152,7 +105,6 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* Estados del badge */
 .status-connected {
     background-color: rgba(34, 197, 94, 0.2);
     color: var(--accent-green);
@@ -178,13 +130,11 @@ body {
     background-color: var(--accent-orange);
 }
 
-/* Animación de pulso para el indicador */
 @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.5; transform: scale(1.2); }
 }
 
-/* --- Main --- */
 .app-main {
     flex: 1;
     padding: var(--space-md);
@@ -196,7 +146,6 @@ body {
     gap: var(--space-lg);
 }
 
-/* --- Footer --- */
 .app-footer {
     background-color: var(--bg-secondary);
     padding: var(--space-md);
@@ -209,13 +158,6 @@ body {
 .app-footer p {
     margin-bottom: var(--space-xs);
 }
-
-/* ========================================
-   4. SECCIÓN DEL CANDADO (Visual Principal)
-   ========================================
-   El candado es el elemento más importante visualmente.
-   Ocupa mucho espacio y tiene animaciones de estado.
-*/
 
 .lock-section {
     text-align: center;
@@ -247,9 +189,9 @@ body {
     transition: background-color var(--transition-slow);
 }
 
-/* Estados visuales del candado */
+/* FONDO AMARILLO PARA BLOQUEADO */
 .lock-visual.locked::before {
-    background-color: var(--accent-red);
+    background-color: var(--accent-yellow);
 }
 .lock-visual.unlocked::before {
     background-color: var(--accent-green);
@@ -258,7 +200,6 @@ body {
     background-color: var(--status-offline);
 }
 
-/* SVG del candado */
 .lock-icon {
     width: 60px;
     height: 60px;
@@ -276,7 +217,6 @@ body {
     transform-origin: 50% 45%;
 }
 
-/* Cuando está desbloqueado, la linga se abre (rota) */
 .lock-visual.unlocked .lock-shackle {
     transform: rotate(-30deg) translateY(-5px);
     stroke: var(--accent-green);
@@ -286,7 +226,6 @@ body {
     stroke: var(--accent-red);
 }
 
-/* Texto de estado */
 .lock-status-text {
     font-size: 1.5rem;
     font-weight: 700;
@@ -294,29 +233,14 @@ body {
     transition: color var(--transition-normal);
 }
 
-.lock-visual.locked + .lock-status-text {
-    color: var(--accent-red);
-}
-
-.lock-visual.unlocked + .lock-status-text {
-    color: var(--accent-green);
-}
-
-.lock-visual.offline + .lock-status-text {
-    color: var(--status-offline);
-}
+.lock-visual.locked + .lock-status-text { color: var(--accent-red); }
+.lock-visual.unlocked + .lock-status-text { color: var(--accent-green); }
+.lock-visual.offline + .lock-status-text { color: var(--status-offline); }
 
 .last-update {
     font-size: 0.75rem;
     color: var(--text-secondary);
 }
-
-/* ========================================
-   5. BOTONES DE CONTROL
-   ========================================
-   Botones grandes y táctiles para fácil uso en móviles.
-   Mínimo 44px de alto (recomendación de accesibilidad).
-*/
 
 .controls-section {
     display: grid;
@@ -338,23 +262,18 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
-    min-height: 80px; /* Área táctil generosa */
-    /* Efecto de presión en móviles */
+    min-height: 80px;
     -webkit-touch-callout: none;
     user-select: none;
 }
 
-/* Efecto hover/active para feedback táctil */
 .btn:active {
     transform: scale(0.96);
     opacity: 0.9;
 }
 
-.btn-icon {
-    font-size: 1.5rem;
-}
+.btn-icon { font-size: 1.5rem; }
 
-/* Botón Desbloquear - Verde */
 .btn-unlock {
     background-color: var(--accent-green);
     color: white;
@@ -365,7 +284,6 @@ body {
     box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
 }
 
-/* Botón Bloquear - Rojo */
 .btn-lock {
     background-color: var(--accent-red);
     color: white;
@@ -376,7 +294,6 @@ body {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
 }
 
-/* Botón Actualizar - Ocupa toda la fila */
 .btn-refresh {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
@@ -390,7 +307,6 @@ body {
     color: var(--bg-primary);
 }
 
-/* Botón primario genérico */
 .btn-primary {
     background-color: var(--accent-blue);
     color: white;
@@ -399,11 +315,8 @@ body {
     gap: var(--space-sm);
     width: 100%;
 }
-.btn-primary:hover {
-    background-color: #2563eb;
-}
+.btn-primary:hover { background-color: #2563eb; }
 
-/* Botón de configuración */
 .btn-settings {
     background: none;
     border: 1px solid var(--bg-tertiary);
@@ -420,11 +333,6 @@ body {
     border-color: var(--accent-blue);
     color: var(--accent-blue);
 }
-
-/* ========================================
-   6. SECCIÓN QR
-   ========================================
-*/
 
 .qr-section, .logs-section {
     background-color: var(--bg-secondary);
@@ -451,14 +359,12 @@ body {
     margin-top: var(--space-lg);
     text-align: center;
     padding: var(--space-md);
-    background-color: white; /* El QR siempre sobre fondo blanco para legibilidad */
+    background-color: white;
     border-radius: var(--radius-md);
     transition: all var(--transition-normal);
 }
 
-.qr-container.hidden {
-    display: none;
-}
+.qr-container.hidden { display: none; }
 
 #qrcode {
     display: flex;
@@ -479,11 +385,6 @@ body {
     margin-top: var(--space-xs);
 }
 
-/* ========================================
-   7. SECCIÓN DE LOGS
-   ========================================
-*/
-
 .logs-container {
     max-height: 200px;
     overflow-y: auto;
@@ -502,26 +403,16 @@ body {
     gap: var(--space-sm);
 }
 
-.log-entry:last-child {
-    border-bottom: none;
-}
+.log-entry:last-child { border-bottom: none; }
 
 .log-time {
     color: var(--text-secondary);
     white-space: nowrap;
 }
 
-.log-event {
-    color: var(--text-primary);
-}
-
-.log-event.alert {
-    color: var(--accent-red);
-}
-
-.log-event.success {
-    color: var(--accent-green);
-}
+.log-event { color: var(--text-primary); }
+.log-event.alert { color: var(--accent-red); }
+.log-event.success { color: var(--accent-green); }
 
 .empty-logs {
     text-align: center;
@@ -529,12 +420,6 @@ body {
     font-style: italic;
     padding: var(--space-md);
 }
-
-/* ========================================
-   8. TOAST NOTIFICATIONS
-   ========================================
-   Notificaciones flotantes que aparecen desde abajo.
-*/
 
 #toast-container {
     position: fixed;
@@ -547,7 +432,7 @@ body {
     gap: var(--space-sm);
     width: 90%;
     max-width: 400px;
-    pointer-events: none; /* Permite clickear a través */
+    pointer-events: none;
 }
 
 .toast {
@@ -570,14 +455,8 @@ body {
 .toast-info { background-color: var(--accent-blue); }
 
 @keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .toast.hiding {
@@ -585,16 +464,8 @@ body {
 }
 
 @keyframes slideDown {
-    to {
-        opacity: 0;
-        transform: translateY(20px);
-    }
+    to { opacity: 0; transform: translateY(20px); }
 }
-
-/* ========================================
-   9. MODAL DE CONFIGURACIÓN
-   ========================================
-*/
 
 .modal {
     position: fixed;
@@ -627,9 +498,7 @@ body {
     transition: transform var(--transition-normal);
 }
 
-.modal:not(.hidden) .modal-content {
-    transform: scale(1);
-}
+.modal:not(.hidden) .modal-content { transform: scale(1); }
 
 .modal-header {
     display: flex;
@@ -639,9 +508,7 @@ body {
     border-bottom: 1px solid var(--bg-tertiary);
 }
 
-.modal-header h2 {
-    font-size: 1.125rem;
-}
+.modal-header h2 { font-size: 1.125rem; }
 
 .btn-close {
     background: none;
@@ -661,11 +528,6 @@ body {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
 }
-
-/* ========================================
-   10. FORMULARIOS
-   ========================================
-*/
 
 .settings-form {
     padding: var(--space-md);
@@ -710,7 +572,6 @@ body {
     color: var(--text-secondary);
 }
 
-/* Toggle switch para modo oscuro */
 .toggle-group {
     flex-direction: row !important;
     align-items: center;
@@ -740,24 +601,11 @@ input[type="checkbox"]::after {
     transition: transform var(--transition-fast);
 }
 
-input[type="checkbox"]:checked {
-    background-color: var(--accent-blue);
-}
+input[type="checkbox"]:checked { background-color: var(--accent-blue); }
+input[type="checkbox"]:checked::after { transform: translateX(24px); }
 
-input[type="checkbox"]:checked::after {
-    transform: translateX(24px);
-}
+.hidden { display: none !important; }
 
-/* ========================================
-   11. UTILIDADES
-   ========================================
-*/
-
-.hidden {
-    display: none !important;
-}
-
-/* Spinner de carga */
 .spinner {
     width: 20px;
     height: 20px;
@@ -767,50 +615,18 @@ input[type="checkbox"]:checked::after {
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* ========================================
-   12. RESPONSIVE (Pantallas más grandes)
-   ========================================
-   Aunque es mobile-first, ajustamos para tablets/desktop.
-*/
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @media (min-width: 481px) {
-    .app-main {
-        padding: var(--space-lg);
-    }
-    
-    .lock-visual {
-        width: 150px;
-        height: 150px;
-    }
-    
-    .lock-icon {
-        width: 75px;
-        height: 75px;
-    }
+    .app-main { padding: var(--space-lg); }
+    .lock-visual { width: 150px; height: 150px; }
+    .lock-icon { width: 75px; height: 75px; }
 }
 
-/* ========================================
-   13. ANIMACIONES ADICIONALES
-   ========================================
-*/
-
-/* Efecto de vibración para alertas de seguridad */
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
     10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
     20%, 40%, 60%, 80% { transform: translateX(5px); }
 }
 
-.shake {
-    animation: shake 0.5s ease-in-out;
-}
-
-/* Efecto de brillo para estados importantes */
-@keyframes glow {
-    0%, 100% { box-shadow: 0 0 5px currentColor; }
-    50% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
-}
+.shake { animation: shake 0.5s ease-in-out; }
