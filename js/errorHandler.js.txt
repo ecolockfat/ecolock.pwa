@@ -1,0 +1,156 @@
+/**
+ * ========================================
+ * MANEJO CENTRALIZADO DE ERRORES
+ * ========================================
+ * 
+ * Propósito: Capturar, clasificar y mostrar errores de forma uniforme.
+ * NUNCA usamos console.log escondido - todos los errores son visibles
+ * para el usuario mediante toast notifications.
+ * 
+ * Estrategia:
+ * 1. Clasificar errores por tipo (red, validación, servidor, etc.)
+ * 2. Mostrar mensajes amigables al usuario
+ * 3. Registrar en logs para debugging
+ */
+
+const ErrorHandler = {
+    // ========================================
+    // TIPOS DE ERRORES
+    // ========================================
+    ERROR_TYPES: {
+        NETWORK: 'network',         // Problemas de conexión WiFi/red
+        TIMEOUT: 'timeout',         // El ESP32 no respondió a tiempo
+        VALIDATION: 'validation',   // Datos inválidos ingresados
+        SERVER: 'server',           // Error del ESP32 (500, etc.)
+        NOT_FOUND: 'not_found',     // Endpoint no existe (404)
+        UNKNOWN: 'unknown'          // Error no clasificado
+    },
+    
+    // ========================================
+    // MENSAJES AMIGABLES POR TIPO
+    // ========================================
+    // Traducimos errores técnicos a mensajes que entienda cualquier usuario
+    FRIENDLY_MESSAGES: {
+        network: '🔌 No se pudo conectar con el EcoLock. Verificá que estés en la misma red WiFi.',
+        timeout: '⏱️ El EcoLock está tardando en responder. ¿Está encendido?',
+        validation: '⚠️ Verificá los datos ingresados.',
+        server: '🔧 El EcoLock tuvo un problema interno. Reinicialo si persiste.',
+        not_found: '❌ El EcoLock no reconoce esa acción. ¿Actualizaste el firmware?',
+        unknown: '❓ Ocurrió un error inesperado. Intentá de nuevo.'
+    },
+    
+    /**
+     * Procesa un error y determina su tipo.
+     * @param {Error} error - El error capturado
+     * @returns {object} - { type, message, original }
+     */
+    classify(error) {
+        // Si es un error de fetch (red)
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            return {
+                type: this.ERROR_TYPES.NETWORK,
+                message: this.FRIENDLY_MESSAGES.network,
+                original: error
+            };
+        }
+        
+        // Si es un error nuestro de timeout
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+            return {
+                type: this.ERROR_TYPES.TIMEOUT,
+                message: this.FRIENDLY_MESSAGES.timeout,
+                original: error
+            };
+        }
+        
+        // Errores HTTP específicos
+        if (error.status) {
+            if (error.status === 404) {
+                return {
+                    type: this.ERROR_TYPES.NOT_FOUND,
+                    message: this.FRIENDLY_MESSAGES.not_found,
+                    original: error
+                };
+            }
+            if (error.status >= 500) {
+                return {
+                    type: this.ERROR_TYPES.SERVER,
+                    message: this.FRIENDLY_MESSAGES.server,
+                    original: error
+                };
+            }
+        }
+        
+        // Errores de validación (nuestros)
+        if (error.name === 'ValidationError') {
+            return {
+                type: this.ERROR_TYPES.VALIDATION,
+                message: error.message || this.FRIENDLY_MESSAGES.validation,
+                original: error
+            };
+        }
+        
+        // Default
+        return {
+            type: this.ERROR_TYPES.UNKNOWN,
+            message: this.FRIENDLY_MESSAGES.unknown,
+            original: error
+        };
+    },
+    
+    /**
+     * Maneja un error completo: clasifica, muestra al usuario y registra.
+     * Esta es la función principal que usan todos los módulos.
+     * @param {Error} error - Error a manejar
+     * @param {string} context - Contexto donde ocurrió (ej: 'API.lock')
+     */
+    handle(error, context = 'general') {
+        const classified = this.classify(error);
+        
+        // 1. Mostrar al usuario mediante toast
+        UI.showToast(classified.message, 'error');
+        
+        // 2. Registrar en logs locales
+        const logEntry = {
+            timestamp: Date.now(),
+            type: CONFIG.EVENT_TYPES.ERROR,
+            context: context,
+            errorType: classified.type,
+            message: classified.message,
+            details: classified.original.message
+        };
+        
+        // Agregamos al log de eventos de la UI
+        UI.addLogEntry({
+            time: Utils.formatDateTime(),
+            event: `Error en ${context}: ${classified.message}`,
+            type: 'error'
+        });
+        
+        // También guardamos en localStorage para persistencia
+        const logs = Storage.get(CONFIG.STORAGE_KEYS.LOGS) || [];
+        logs.push(logEntry);
+        Storage.set(CONFIG.STORAGE_KEYS.LOGS, Utils.limitArraySize(logs));
+        
+        // 3. Log en consola SOLO para desarrollo (no escondido, es útil)
+        console.error(`[EcoLock Error][${context}]`, {
+            type: classified.type,
+            message: classified.message,
+            original: classified.original
+        });
+        
+        return classified;
+    },
+    
+    /**
+     * Crea un error de validación personalizado.
+     * @param {string} message - Mensaje descriptivo
+     */
+    createValidationError(message) {
+        const error = new Error(message);
+        error.name = 'ValidationError';
+        return error;
+    }
+};
+
+window.ErrorHandler = ErrorHandler;

@@ -1,0 +1,386 @@
+/**
+ * ========================================
+ * MANIPULACIÓN DEL DOM E INTERFAZ DE USUARIO
+ * ========================================
+ * 
+ * Propósito: Centralizar TODA la manipulación del DOM.
+ * Ningún otro módulo debe tocar document.getElementById directamente.
+ * Esto permite cambiar la estructura HTML sin romper la lógica.
+ */
+
+const UI = {
+    // ========================================
+    // REFERENCIAS A ELEMENTOS DOM
+    // ========================================
+    // Cacheamos referencias para no buscar en el DOM repetidamente
+    
+    elements: {},
+    
+    /**
+     * Inicializa las referencias a elementos del DOM.
+     * Se llama una sola vez al iniciar la app.
+     */
+    initElements() {
+        this.elements = {
+            // Header
+            connectionStatus: document.getElementById('connection-status'),
+            
+            // Lock visual
+            lockVisual: document.getElementById('lock-visual'),
+            lockStatusText: document.getElementById('lock-status-text'),
+            lastUpdate: document.getElementById('last-update'),
+            
+            // Botones
+            btnLock: document.getElementById('btn-lock'),
+            btnUnlock: document.getElementById('btn-unlock'),
+            btnRefresh: document.getElementById('btn-refresh'),
+            btnGenerateQR: document.getElementById('btn-generate-qr'),
+            btnSettings: document.getElementById('btn-settings'),
+            btnCloseSettings: document.getElementById('btn-close-settings'),
+            
+            // QR
+            qrContainer: document.getElementById('qr-container'),
+            
+            // Logs
+            logsContainer: document.getElementById('logs-container'),
+            
+            // Modal
+            settingsModal: document.getElementById('settings-modal'),
+            settingsForm: document.getElementById('settings-form'),
+            
+            // Form inputs
+            espIpInput: document.getElementById('esp-ip'),
+            pollingIntervalSelect: document.getElementById('polling-interval'),
+            darkModeToggle: document.getElementById('dark-mode'),
+            
+            // Toast container
+            toastContainer: document.getElementById('toast-container')
+        };
+    },
+    
+    // ========================================
+    // ACTUALIZACIÓN DE ESTADO VISUAL
+    // ========================================
+    
+    /**
+     * Actualiza el indicador visual del candado.
+     * @param {string} status - 'locked', 'unlocked', 'unknown', 'pending'
+     */
+    updateLockStatus(status) {
+        const { lockVisual, lockStatusText, lastUpdate } = this.elements;
+        
+        // Removemos todas las clases de estado
+        lockVisual.classList.remove('locked', 'unlocked', 'offline', 'pending');
+        
+        // Mapeo de estados a textos y clases
+        const statusMap = {
+            [CONFIG.LOCK_STATES.LOCKED]: {
+                class: 'locked',
+                text: 'Bloqueado',
+                color: 'var(--accent-red)'
+            },
+            [CONFIG.LOCK_STATES.UNLOCKED]: {
+                class: 'unlocked',
+                text: 'Desbloqueado',
+                color: 'var(--accent-green)'
+            },
+            [CONFIG.LOCK_STATES.UNKNOWN]: {
+                class: 'offline',
+                text: 'Sin conexión',
+                color: 'var(--status-offline)'
+            },
+            [CONFIG.LOCK_STATES.PENDING]: {
+                class: 'pending',
+                text: 'Pendiente de sincronización',
+                color: 'var(--accent-orange)'
+            }
+        };
+        
+        const config = statusMap[status] || statusMap.unknown;
+        
+        // Aplicamos la clase y actualizamos textos
+        lockVisual.classList.add(config.class);
+        lockStatusText.textContent = config.text;
+        lockStatusText.style.color = config.color;
+        lastUpdate.textContent = `Última actualización: ${Utils.formatDateTime()}`;
+        
+        // Actualizamos el título de la página
+        document.title = `EcoLock - ${config.text}`;
+    },
+    
+    /**
+     * Actualiza el indicador de estado de conexión.
+     * @param {string} status - 'connected', 'disconnected', 'pending'
+     */
+    updateConnectionStatus(status) {
+        const { connectionStatus } = this.elements;
+        
+        // Removemos clases anteriores
+        connectionStatus.classList.remove('status-connected', 'status-disconnected', 'status-pending');
+        
+        const statusMap = {
+            connected: {
+                class: 'status-connected',
+                text: 'Conectado',
+                ariaLabel: 'Conectado al EcoLock'
+            },
+            disconnected: {
+                class: 'status-disconnected',
+                text: 'Sin conexión',
+                ariaLabel: 'Sin conexión con el EcoLock'
+            },
+            pending: {
+                class: 'status-pending',
+                text: 'Sincronizando...',
+                ariaLabel: 'Sincronizando acciones pendientes'
+            }
+        };
+        
+        const config = statusMap[status] || statusMap.disconnected;
+        
+        connectionStatus.classList.add(config.class);
+        connectionStatus.querySelector('.status-text').textContent = config.text;
+        connectionStatus.setAttribute('aria-label', config.ariaLabel);
+    },
+    
+    // ========================================
+    // TOAST NOTIFICATIONS
+    // ========================================
+    
+    /**
+     * Muestra una notificación toast flotante.
+     * @param {string} message - Mensaje a mostrar
+     * @param {string} type - 'success', 'error', 'warning', 'info'
+     * @param {number} duration - Duración en ms (default 4000)
+     */
+    showToast(message, type = 'info', duration = 4000) {
+        const { toastContainer } = this.elements;
+        
+        // Creamos el elemento toast
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.setAttribute('role', 'alert');
+        
+        // Icono según tipo
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        
+        toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${Utils.sanitizeInput(message)}</span>`;
+        
+        // Agregamos al contenedor
+        toastContainer.appendChild(toast);
+        
+        // Eliminamos después del tiempo especificado
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            toast.addEventListener('animationend', () => {
+                toast.remove();
+            });
+        }, duration);
+    },
+    
+    // ========================================
+    // LOGS DE EVENTOS
+    // ========================================
+    
+    /**
+     * Agrega una entrada al registro de eventos.
+     * @param {object} entry - { time, event, type }
+     */
+    addLogEntry(entry) {
+        const { logsContainer } = this.elements;
+        
+        // Si es el primer log, limpiamos el mensaje de "vacío"
+        if (logsContainer.querySelector('.empty-logs')) {
+            logsContainer.innerHTML = '';
+        }
+        
+        // Creamos el elemento de log
+        const logElement = document.createElement('div');
+        logElement.className = 'log-entry';
+        
+        const typeClass = entry.type === 'error' ? 'alert' : (entry.type === 'success' ? 'success' : '');
+        
+        logElement.innerHTML = `
+            <span class="log-time">${Utils.sanitizeInput(entry.time)}</span>
+            <span class="log-event ${typeClass}">${Utils.sanitizeInput(entry.event)}</span>
+        `;
+        
+        // Agregamos al principio (más reciente arriba)
+        logsContainer.insertBefore(logElement, logsContainer.firstChild);
+        
+        // Limitamos a 20 entradas visibles para no sobrecargar el DOM
+        while (logsContainer.children.length > 20) {
+            logsContainer.removeChild(logsContainer.lastChild);
+        }
+    },
+    
+    // ========================================
+    // MODAL DE CONFIGURACIÓN
+    // ========================================
+    
+    /**
+     * Abre el modal de configuración y carga valores actuales.
+     */
+    openSettings() {
+        const { settingsModal, espIpInput, pollingIntervalSelect, darkModeToggle } = this.elements;
+        
+        // Cargamos valores guardados
+        espIpInput.value = Storage.getIP() || '';
+        pollingIntervalSelect.value = String(Storage.getPollingInterval());
+        darkModeToggle.checked = Storage.getDarkMode();
+        
+        settingsModal.classList.remove('hidden');
+        
+        // Focus en el primer input para accesibilidad
+        setTimeout(() => espIpInput.focus(), 100);
+    },
+    
+    /**
+     * Cierra el modal de configuración.
+     */
+    closeSettings() {
+        this.elements.settingsModal.classList.add('hidden');
+    },
+    
+    /**
+     * Guarda la configuración del formulario.
+     */
+    saveSettings() {
+        const { espIpInput, pollingIntervalSelect, darkModeToggle } = this.elements;
+        
+        try {
+            // Validamos y guardamos IP
+            const ip = espIpInput.value.trim();
+            Storage.saveIP(ip);
+            
+            // Guardamos intervalo de polling
+            const interval = parseInt(pollingIntervalSelect.value, 10);
+            Storage.savePollingInterval(interval);
+            
+            // Guardamos modo oscuro
+            const isDark = darkModeToggle.checked;
+            Storage.saveDarkMode(isDark);
+            this.applyTheme(isDark);
+            
+            // Reiniciamos polling con nueva configuración
+            API.restartPolling();
+            
+            this.closeSettings();
+            this.showToast('✅ Configuración guardada', 'success');
+            
+        } catch (error) {
+            ErrorHandler.handle(error, 'UI.saveSettings');
+        }
+    },
+    
+    // ========================================
+    // TEMA (MODO OSCURO/CLARO)
+    // ========================================
+    
+    /**
+     * Aplica el tema oscuro o claro.
+     * @param {boolean} isDark - True para modo oscuro
+     */
+    applyTheme(isDark) {
+        if (isDark) {
+            document.body.classList.remove('light-mode');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a');
+        } else {
+            document.body.classList.add('light-mode');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f8fafc');
+        }
+    },
+    
+    // ========================================
+    // EVENT LISTENERS
+    // ========================================
+    
+    /**
+     * Configura todos los event listeners de la aplicación.
+     * Se llama una sola vez al iniciar.
+     */
+    setupEventListeners() {
+        const {
+            btnLock, btnUnlock, btnRefresh, btnGenerateQR,
+            btnSettings, btnCloseSettings, settingsForm
+        } = this.elements;
+        
+        // Botón Bloquear
+        btnLock.addEventListener('click', async () => {
+            btnLock.disabled = true;
+            try {
+                await API.executeAction('lock');
+            } finally {
+                btnLock.disabled = false;
+            }
+        });
+        
+        // Botón Desbloquear
+        btnUnlock.addEventListener('click', async () => {
+            btnUnlock.disabled = true;
+            try {
+                await API.executeAction('unlock');
+            } finally {
+                btnUnlock.disabled = false;
+            }
+        });
+        
+        // Botón Actualizar (manual)
+        btnRefresh.addEventListener('click', async () => {
+            btnRefresh.disabled = true;
+            try {
+                const status = await API.getStatus();
+                API.isConnected = true;
+                this.updateConnectionStatus('connected');
+                this.updateLockStatus(status.locked ? 'locked' : 'unlocked');
+                this.showToast('🔄 Estado actualizado', 'info');
+            } catch (error) {
+                ErrorHandler.handle(error, 'UI.refresh');
+            } finally {
+                btnRefresh.disabled = false;
+            }
+        });
+        
+        // Botón Generar QR
+        btnGenerateQR.addEventListener('click', () => {
+            QRManager.generate();
+        });
+        
+        // Botón Configuración (abre modal)
+        btnSettings.addEventListener('click', () => {
+            this.openSettings();
+        });
+        
+        // Cerrar modal
+        btnCloseSettings.addEventListener('click', () => {
+            this.closeSettings();
+        });
+        
+        // Cerrar modal al hacer clic fuera
+        this.elements.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.settingsModal) {
+                this.closeSettings();
+            }
+        });
+        
+        // Guardar configuración (submit del form)
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Evitamos recarga de página
+            this.saveSettings();
+        });
+        
+        // Tecla Escape cierra el modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !this.elements.settingsModal.classList.contains('hidden')) {
+                this.closeSettings();
+            }
+        });
+    }
+};
+
+window.UI = UI;

@@ -1,0 +1,132 @@
+/**
+ * ========================================
+ * CONFIGURACIÓN CENTRALIZADA
+ * ========================================
+ * 
+ * Propósito: Centralizar todas las constantes y configuraciones
+ * de la aplicación en un solo lugar. Esto facilita:
+ * - Modificar valores sin buscar en todo el código
+ * - Mantener consistencia entre módulos
+ * - Adaptar la app a diferentes entornos (desarrollo/producción)
+ */
+
+const CONFIG = {
+    // ========================================
+    // INFORMACIÓN DEL PROYECTO
+    // ========================================
+    APP_NAME: 'EcoLock',
+    VERSION: '1.0.0',
+    AUTHORS: ['Braian Francisco', 'Estrella Nazareno', 'Figueroa Gonzalo', 'Ruartes Thiago'],
+    SCHOOL: 'IPET Nº259 Ambrosio Olmos - 7mo C',
+    
+    // ========================================
+    // CONFIGURACIÓN DE RED (ESP32)
+    // ========================================
+    // Puerto por defecto del servidor HTTP del ESP32
+    ESP_PORT: 80,
+    
+    // Timeouts para peticiones HTTP (en milisegundos)
+    // Un timeout muy corto puede causar falsos negativos en redes lentas
+    // Un timeout muy largo hace que la UI se sienta lenta
+    TIMEOUT: {
+        DEFAULT: 5000,      // 5 segundos para la mayoría de peticiones
+        STATUS: 3000,       // 3 segundos para polling de estado (más frecuente)
+        QR_VERIFY: 10000    // 10 segundos para verificación de QR
+    },
+    
+    // ========================================
+    // CONFIGURACIÓN DE POLLING
+    // ========================================
+    // Intervalos posibles para actualización automática
+    POLLING_INTERVALS: {
+        FAST: 5000,     // 5 segundos
+        NORMAL: 10000,  // 10 segundos
+        SLOW: 30000,    // 30 segundos
+        MANUAL: 0       // Solo manual (sin polling automático)
+    },
+    
+    // Valor por defecto si no hay configuración guardada
+    DEFAULT_POLLING_INTERVAL: 5000,
+    
+    // ========================================
+    // CONFIGURACIÓN DE QR
+    // ========================================
+    QR: {
+        // Tiempo de validez del QR en milisegundos (5 minutos)
+        EXPIRATION_TIME: 5 * 60 * 1000,
+        // Tamaño del QR en píxeles
+        SIZE: 200,
+        // Nivel de corrección de errores (L = bajo, mejor para URLs largas)
+        CORRECTION_LEVEL: QRCode.CorrectLevel.L
+    },
+    
+    // ========================================
+    // CONFIGURACIÓN DE REINTENTOS
+    // ========================================
+    // Cuántas veces reintentar una petición fallida antes de declarar error
+    MAX_RETRIES: 3,
+    // Tiempo entre reintentos (backoff exponencial: 1s, 2s, 4s)
+    RETRY_DELAY_BASE: 1000,
+    
+    // ========================================
+    // LÍMITES Y VALIDACIONES
+    // ========================================
+    // Validación de IP (formato IPv4)
+    IP_REGEX: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
+    
+    // Longitudes máximas para inputs
+    MAX_INPUT_LENGTH: 50,
+    
+    // ========================================
+    // CLAVES DE LOCALSTORAGE
+    // ========================================
+    // Usamos prefijo para evitar colisiones con otras apps
+    STORAGE_PREFIX: 'ecolock_',
+    STORAGE_KEYS: {
+        IP: 'esp_ip',           // IP del ESP32
+        POLLING: 'polling_interval', // Intervalo de actualización
+        DARK_MODE: 'dark_mode', // Preferencia de tema
+        LOGS: 'event_logs',     // Historial de eventos
+        PENDING_ACTIONS: 'pending_actions' // Acciones pendientes (modo offline)
+    },
+    
+    // ========================================
+    // ENDPOINTS DE LA API DEL ESP32
+    // ========================================
+    // Definimos las rutas para mantener consistencia
+    ENDPOINTS: {
+        STATUS: '/status',      // GET - Obtener estado actual
+        LOCK: '/lock',          // POST - Bloquear
+        UNLOCK: '/unlock',      // POST - Desbloquear
+        QR_VERIFY: '/qr-verify' // POST - Verificar token QR
+    },
+    
+    // ========================================
+    // ESTADOS POSIBLES DEL CANDADO
+    // ========================================
+    LOCK_STATES: {
+        LOCKED: 'locked',       // Bloqueado
+        UNLOCKED: 'unlocked',   // Desbloqueado
+        UNKNOWN: 'unknown',     // Estado desconocido (sin conexión)
+        PENDING: 'pending'      // Acción pendiente de sincronización
+    },
+    
+    // ========================================
+    // TIPOS DE EVENTOS PARA LOGS
+    // ========================================
+    EVENT_TYPES: {
+        LOCK: 'lock',
+        UNLOCK: 'unlock',
+        ALERT: 'alert',
+        CONNECT: 'connect',
+        DISCONNECT: 'disconnect',
+        QR_GENERATED: 'qr_generated',
+        QR_USED: 'qr_used',
+        ERROR: 'error'
+    }
+};
+
+// Exportamos la configuración para que otros módulos la usen
+// En navegadores modernos, usamos window para hacerla global
+// dentro del scope de la aplicación
+window.CONFIG = CONFIG;

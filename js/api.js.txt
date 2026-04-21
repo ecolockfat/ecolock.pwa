@@ -1,0 +1,308 @@
+/**
+ * ========================================
+ * COMUNICACIÓN HTTP CON EL ESP32
+ * ========================================
+ * 
+ * Propósito: Manejar TODA la comunicación con el hardware.
+ * Incluye: fetch con timeout, reintentos automáticos, manejo de errores,
+ * y encolamiento de acciones cuando no hay conexión.
+ * 
+ * IMPORTANTE: El ESP32 debe estar en la MISMA red WiFi que el celular.
+ */
+
+const API = {
+    // ========================================
+    // PROPIEDADES DE ESTADO
+    // ========================================
+    
+    // Controlador para abortar peticiones (útil para timeouts)
+    abortController: null,
+    
+    // ID del intervalo de polling
+    pollingIntervalId: null,
+    
+    // Estado de conexión actual
+    isConnected: false,
+    
+    // ========================================
+    // MÉTODO BASE DE PETICIONES HTTP
+    // ========================================
+    
+    /**
+     * Realiza una petición HTTP al ESP32 con timeout y reintentos.
+     * 
+     * @param {string} endpoint - Ruta del endpoint (ej: '/status')
+     * @param {object} options - Opciones de fetch (method, body, etc.)
+     * @param {number} timeout - Timeout en ms (usa config por defecto)
+     * @param {number} retries - Reintentos restantes
+     * @returns {Promise<object>} - Respuesta del servidor
+     */
+    async request(endpoint, options = {}, timeout = CONFIG.TIMEOUT.DEFAULT, retries = CONFIG.MAX_RETRIES) {
+        // Validamos que tengamos IP configurada
+        const ip = Storage.getIP();
+        if (!ip) {
+            throw ErrorHandler.createValidationError(
+                'No configuraste la IP del EcoLock. Andá a Configuración ⚙️'
+            );
+        }
+        
+        const url = Utils.buildUrl(endpoint, ip);
+        
+        // Creamos un AbortController para manejar el timeout
+        this.abortController = new AbortController();
+        const timeoutId = setTimeout(() => this.abortController.abort(), timeout);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: this.abortController.signal,
+                // Headers por defecto
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            // Si la respuesta no es OK, lanzamos error con el status
+            if (!response.ok) {
+                const error = new Error(`HTTP ${response.status}`);
+                error.status = response.status;
+                throw error;
+            }
+            
+            // Intentamos parsear como JSON, si falla devolvemos texto
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return await response.json();
+            }
+            return await response.text();
+            
+        } catch (error) {
+            clearTimeout(timeoutId);
+            
+            // Si hay reintentos disponibles y es error de red/timeout
+            if (retries > 0 && (error.name === 'AbortError' || error.name === 'TypeError')) {
+                const delay = Utils.exponentialBackoff(CONFIG.MAX_RETRIES - retries + 1);
+                await Utils.sleep(delay);
+                return this.request(endpoint, options, timeout, retries - 1);
+            }
+            
+            // Si no hay más reintentos, propagamos el error
+            throw error;
+        }
+    },
+    
+    // ========================================
+    // ENDPOINTS ESPECÍFICOS
+    // ========================================
+    
+    /**
+     * Obtiene el estado actual del candado.
+     * @returns {Promise<{locked: boolean, battery: number, alerts: array}>}
+     */
+    async getStatus() {
+        return this.request(
+            CONFIG.ENDPOINTS.STATUS,
+            { method: 'GET' },
+            CONFIG.TIMEOUT.STATUS
+        );
+    },
+    
+    /**
+     * Envía comando para bloquear el candado.
+     */
+    async lock() {
+        return this.request(
+            CONFIG.ENDPOINTS.LOCK,
+            { method: 'POST' }
+        );
+    },
+    
+    /**
+     * Envía comando para desbloquear el candado.
+     */
+    async unlock() {
+        return this.request(
+            CONFIG.ENDPOINTS.UNLOCK,
+            { method: 'POST' }
+        );
+    },
+    
+    /**
+     * Verifica un token QR en el ESP32.
+     * @param {string} token - Token QR a verificar
+     */
+    async verifyQR(token) {
+        return this.request(
+            CONFIG.ENDPOINTS.QR_VERIFY,
+            {
+                method: 'POST',
+                body: JSON.stringify({ token: token })
+            },
+            CONFIG.TIMEOUT.QR_VERIFY
+        );
+    },
+    
+    // ========================================
+    // POLLING AUTOMÁTICO
+    // ========================================
+    
+    /**
+     * Inicia el polling automático de estado.
+     * Consulta al ESP32 periódicamente según la configuración.
+     */
+    startPolling() {
+        // Primero detenemos cualquier polling anterior
+        this.stopPolling();
+        
+        const interval = Storage.getPollingInterval();
+        
+        // Si el intervalo es 0, no hacemos polling (solo manual)
+        if (interval === 0) return;
+        
+        // Función que ejecuta el polling
+        const poll = async () => {
+            try {
+                const status = await this.getStatus();
+                this.isConnected = true;
+                UI.updateConnectionStatus('connected');
+                UI.updateLockStatus(status.locked ? 'locked' : 'unlocked');
+                
+                // Si hay acciones pendientes, intentamos sincronizar
+                await this.syncPendingActions();
+                
+            } catch (error) {
+                this.isConnected = false;
+                UI.updateConnectionStatus('disconnected');
+                UI.updateLockStatus('unknown');
+                // No mostramos error en polling automático para no molestar
+                // Solo lo registramos silenciosamente
+                console.log('Polling falló (posible desconexión):', error.message);
+            }
+        };
+        
+        // Ejecutamos inmediatamente y luego en intervalos
+        poll();
+        this.pollingIntervalId = setInterval(poll, interval);
+    },
+    
+    /**
+     * Detiene el polling automático.
+     */
+    stopPolling() {
+        if (this.pollingIntervalId) {
+            clearInterval(this.pollingIntervalId);
+            this.pollingIntervalId = null;
+        }
+    },
+    
+    /**
+     * Reinicia el polling (útil después de cambiar configuración).
+     */
+    restartPolling() {
+        this.stopPolling();
+        this.startPolling();
+    },
+    
+    // ========================================
+    // SINCRONIZACIÓN DE ACCIONES PENDIENTES
+    // ========================================
+    
+    /**
+     * Intenta ejecutar las acciones que quedaron pendientes por falta de conexión.
+     */
+    async syncPendingActions() {
+        const pending = Storage.getPendingActions();
+        if (pending.length === 0) return;
+        
+        UI.showToast(`🔄 Sincronizando ${pending.length} acción(es) pendiente(s)...`, 'info');
+        UI.updateConnectionStatus('pending');
+        
+        const successful = [];
+        const failed = [];
+        
+        for (let i = 0; i < pending.length; i++) {
+            const action = pending[i];
+            try {
+                if (action.action === 'lock') {
+                    await this.lock();
+                } else if (action.action === 'unlock') {
+                    await this.unlock();
+                }
+                successful.push(i);
+            } catch (error) {
+                failed.push(i);
+            }
+        }
+        
+        // Eliminamos las acciones exitosas de la cola
+        // Iteramos al revés para no alterar los índices
+        for (let i = successful.length - 1; i >= 0; i--) {
+            Storage.removePendingAction(successful[i]);
+        }
+        
+        const remaining = Storage.getPendingActions().length;
+        if (remaining === 0) {
+            UI.showToast('✅ Todas las acciones sincronizadas', 'success');
+        } else {
+            UI.showToast(`⚠️ ${remaining} acción(es) siguen pendientes`, 'warning');
+        }
+    },
+    
+    // ========================================
+    // EJECUCIÓN CON MANEJO DE OFFLINE
+    // ========================================
+    
+    /**
+     * Ejecuta una acción (lock/unlock) con manejo de modo offline.
+     * Si no hay conexión, encola la acción para después.
+     * 
+     * @param {string} action - 'lock' o 'unlock'
+     */
+    async executeAction(action) {
+        try {
+            if (action === 'lock') {
+                await this.lock();
+                UI.updateLockStatus('locked');
+                UI.addLogEntry({
+                    time: Utils.formatDateTime(),
+                    event: 'Candado bloqueado remotamente',
+                    type: 'success'
+                });
+                UI.showToast('🔒 Candado bloqueado', 'success');
+            } else {
+                await this.unlock();
+                UI.updateLockStatus('unlocked');
+                UI.addLogEntry({
+                    time: Utils.formatDateTime(),
+                    event: 'Candado desbloqueado remotamente',
+                    type: 'success'
+                });
+                UI.showToast('🔓 Candado desbloqueado', 'success');
+            }
+            
+            // Feedback táctil (vibración)
+            Utils.vibrate(100);
+            
+        } catch (error) {
+            // Si es error de red, encolamos la acción
+            const classified = ErrorHandler.classify(error);
+            
+            if (classified.type === 'network' || classified.type === 'timeout') {
+                Storage.addPendingAction(action);
+                UI.updateLockStatus('pending');
+                UI.showToast(
+                    `📴 Sin conexión. Acción "${action}" guardada para sincronizar.`,
+                    'warning'
+                );
+            } else {
+                // Otro tipo de error, lo propagamos
+                throw error;
+            }
+        }
+    }
+};
+
+window.API = API;

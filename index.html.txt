@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>EcoLock - Candado Inteligente</title>
+    <!-- Manifest para instalación como PWA -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Iconos para diferentes plataformas -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <!-- Hoja de estilos principal -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Librería QRCode.js desde CDN (única dependencia externa permitida) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <!-- 
+        ESTRUCTURA SEMÁNTICA DE LA APP
+        ==============================
+        - header: Barra superior con título y estado de conexión
+        - main: Contenido principal dividido en secciones
+        - footer: Información del proyecto escolar
+    -->
+
+    <!-- CONTENEDOR DE NOTIFICACIONES (toast notifications) -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- HEADER: Título y estado de conexión -->
+    <header class="app-header">
+        <div class="header-content">
+            <h1>🔐 EcoLock</h1>
+            <div id="connection-status" class="status-badge status-disconnected" aria-label="Sin conexión">
+                <span class="status-dot"></span>
+                <span class="status-text">Sin conexión</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN: Contenido principal -->
+    <main class="app-main">
+        
+        <!-- SECCIÓN 1: ESTADO DEL CANDADO (Visual principal) -->
+        <section class="lock-section" aria-label="Estado del candado">
+            <div id="lock-visual" class="lock-visual locked" role="img" aria-label="Candado bloqueado">
+                <!-- SVG del candado, cambia con CSS según estado -->
+                <svg viewBox="0 0 100 100" class="lock-icon">
+                    <rect x="25" y="45" width="50" height="40" rx="5" class="lock-body"/>
+                    <path d="M30 45 V30 A20 20 0 0 1 70 30 V45" class="lock-shackle" fill="none" stroke-width="8" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h2 id="lock-status-text" class="lock-status-text">Bloqueado</h2>
+            <p id="last-update" class="last-update">Última actualización: --</p>
+        </section>
+
+        <!-- SECCIÓN 2: BOTONES DE CONTROL -->
+        <section class="controls-section" aria-label="Controles del candado">
+            <button id="btn-unlock" class="btn btn-unlock" aria-label="Desbloquear candado">
+                <span class="btn-icon">🔓</span>
+                <span class="btn-text">Desbloquear</span>
+            </button>
+            <button id="btn-lock" class="btn btn-lock" aria-label="Bloquear candado">
+                <span class="btn-icon">🔒</span>
+                <span class="btn-text">Bloquear</span>
+            </button>
+            <button id="btn-refresh" class="btn btn-refresh" aria-label="Actualizar estado manualmente">
+                <span class="btn-icon">🔄</span>
+                <span class="btn-text">Actualizar</span>
+            </button>
+        </section>
+
+        <!-- SECCIÓN 3: QR DE ACCESO TEMPORAL -->
+        <section class="qr-section" aria-label="Código QR de acceso temporal">
+            <h3>📱 Acceso Temporal</h3>
+            <p class="section-desc">Generá un QR para compartir acceso por 5 minutos</p>
+            <button id="btn-generate-qr" class="btn btn-primary">
+                Generar QR
+            </button>
+            <div id="qr-container" class="qr-container hidden">
+                <div id="qrcode"></div>
+                <p id="qr-timer" class="qr-timer">Expira en: 05:00</p>
+                <p class="qr-hint">Escaneá con cualquier lector de QR</p>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 4: LOG DE EVENTOS -->
+        <section class="logs-section" aria-label="Registro de eventos">
+            <h3>📋 Registro de Eventos</h3>
+            <div id="logs-container" class="logs-container">
+                <p class="empty-logs">No hay eventos registrados</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER: Info del proyecto escolar -->
+    <footer class="app-footer">
+        <p><strong>IPET Nº259 Ambrosio Olmos - 7mo C</strong></p>
+        <p>Braian, Estrella, Gonzalo, Thiago</p>
+        <button id="btn-settings" class="btn-settings" aria-label="Abrir configuración">⚙️ Configuración</button>
+    </footer>
+
+    <!-- MODAL DE CONFIGURACIÓN -->
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2 id="settings-title">⚙️ Configuración</h2>
+                <button id="btn-close-settings" class="btn-close" aria-label="Cerrar configuración">✕</button>
+            </header>
+            
+            <form id="settings-form" class="settings-form">
+                <!-- Configuración de IP del ESP32 -->
+                <div class="form-group">
+                    <label for="esp-ip">IP del ESP32:</label>
+                    <input type="text" id="esp-ip" placeholder="192.168.1.100" pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" required>
+                    <small>IP asignada por tu router WiFi</small>
+                </div>
+
+                <!-- Intervalo de polling -->
+                <div class="form-group">
+                    <label for="polling-interval">Intervalo de actualización:</label>
+                    <select id="polling-interval">
+                        <option value="5000">5 segundos</option>
+                        <option value="10000">10 segundos</option>
+                        <option value="30000">30 segundos</option>
+                        <option value="0">Solo manual</option>
+                    </select>
+                </div>
+
+                <!-- Modo oscuro/claro -->
+                <div class="form-group toggle-group">
+                    <label for="dark-mode">Modo oscuro:</label>
+                    <input type="checkbox" id="dark-mode" checked>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Guardar configuración</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPTS: Cargados en orden de dependencias -->
+    <!-- 1. Configuración centralizada (constantes primero) -->
+    <script src="js/config.js"></script>
+    <!-- 2. Utilidades y validaciones (sin dependencias) -->
+    <script src="js/utils.js"></script>
+    <!-- 3. Manejo de errores centralizado -->
+    <script src="js/errorHandler.js"></script>
+    <!-- 4. Almacenamiento local -->
+    <script src="js/storage.js"></script>
+    <!-- 5. Comunicación con ESP32 -->
+    <script src="js/api.js"></script>
+    <!-- 6. Generación de QR -->
+    <script src="js/qr.js"></script>
+    <!-- 7. Manipulación del DOM/UI -->
+    <script src="js/ui.js"></script>
+    <!-- 8. Punto de entrada de la aplicación -->
+    <script src="js/app.js"></script>
+</body>
+</html>
